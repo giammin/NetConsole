@@ -1,11 +1,11 @@
 # NetConsole
-some netcore console project to reuse e modify
+some netcore console projects to reuse e modify
 
-## 1
+## CoreConsole
 simple console model with async, dependency inhection and configuration from files
 
-## 2
+## ExcelImporter
 excel file scraper
 
-## 4
+## OidcClientsTest
 test oidc client configurations
