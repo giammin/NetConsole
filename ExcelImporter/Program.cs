@@ -27,7 +27,7 @@ namespace ExcelImporter
                 await using var servicesProvider = services.BuildServiceProvider();
                 logger.Info("Starting...");
                 //servicesProvider.GetRequiredService<ConsoleApp>().Run();
-                await servicesProvider.GetRequiredService<ExcelReader>().RunAsync("D:\\Temp\\testfile.xlsx", CancellationToken.None);
+                await servicesProvider.GetRequiredService<RowDtoExcelReader>().RunAsync("D:\\Temp\\test.xlsx", CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -75,7 +75,7 @@ namespace ExcelImporter
                 loggingBuilder.AddNLog(_configuration);
             });
 
-            services.AddTransient<ExcelReader>();
+            services.AddTransient<RowDtoExcelReader>();
 
             //for IOptions
             services.AddOptions();

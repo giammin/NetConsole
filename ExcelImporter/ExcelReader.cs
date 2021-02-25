@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,20 +10,20 @@ using OfficeOpenXml;
 
 namespace ExcelImporter
 {
-    public class ExcelReader
+    public abstract class ExcelReaderBase<T>
     {
-        private readonly ILogger<ExcelReader> _logger;
-        private readonly ConsoleConfig _config;
+        protected readonly ILogger<ExcelReaderBase<T>> Logger;
+        protected readonly ConsoleConfig Config;
 
-        public ExcelReader(IOptions<ConsoleConfig> configuration, ILogger<ExcelReader> logger)
+        protected ExcelReaderBase(IOptions<ConsoleConfig> configuration, ILogger<ExcelReaderBase<T>> logger)
         {
-            _logger = logger;
-            _config = configuration.Value;
+            Logger = logger;
+            Config = configuration.Value;
         }
 
         public async Task RunAsync(string filePath, CancellationToken cancellationToken)
         {
-            _logger.LogInformation("RunAsync");
+            Logger.LogInformation("RunAsync");
 
             var fileInfo = new FileInfo(filePath);
             if (!fileInfo.Exists)
@@ -32,76 +34,63 @@ namespace ExcelImporter
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             using var package = new ExcelPackage(fileInfo);
             var worksheet = package.Workbook.Worksheets[0];
-            
-            int emailColumnIndex = 0;
-            int nameColumnIndex = 0;
-            int lastNameColumnIndex = 0;
+
+            var columnMapping = new Dictionary<string, int>();
 
             for (int i = worksheet.Dimension.Start.Column; i < worksheet.Dimension.End.Column + 1; i++)
             {
-
                 string columnName = worksheet.Cells[worksheet.Dimension.Start.Row, i].GetValue<string>()?.Trim().ToLower()??string.Empty;
-                switch (columnName)
+
+                MapColumns(columnName, i, columnMapping);
+            }
+            ValidateColumnMapping(columnMapping);
+
+            for (int i = worksheet.Dimension.Start.Row + 1; i <= worksheet.Dimension.End.Row; i++)
+            {
+                var rowDto = MapRow(worksheet, i, columnMapping);
+
+                var ctx = new ValidationContext(rowDto);
+
+
+                var results = new List<ValidationResult>();
+                if (!Validator.TryValidateObject(rowDto, ctx, results, true))
                 {
-                    case "email":
-                        emailColumnIndex = i;
-                        break;
-                    case "e-mail":
-                        emailColumnIndex = i;
-                        break;
-                    case "mail":
-                        emailColumnIndex = i;
-                        break;
-                    case "nome":
-                        nameColumnIndex = i;
-                        break;
-                    case "name":
-                        nameColumnIndex = i;
-                        break;
-                    case "firstname":
-                        nameColumnIndex = i;
-                        break;
-                    case "first name":
-                        nameColumnIndex = i;
-                        break;
-                    case "cognome":
-                        lastNameColumnIndex = i;
-                        break;
-                    case "lastname":
-                        lastNameColumnIndex = i;
-                        break;
-                    case "last name":
-                        lastNameColumnIndex = i;
-                        break;
-                    case "last-name":
-                        lastNameColumnIndex = i;
-                        break;
-                    case "family name":
-                        lastNameColumnIndex = i;
-                        break;
-                    case "familyname":
-                        lastNameColumnIndex = i;
-                        break;
+                    Logger.LogError($"{i} - ERROR FOUND {results.Count}");
+                    foreach (var error in results)
+                    {
+                        Logger.LogError($"\t{error}");
+                    }
                 }
-
-                if (emailColumnIndex == 0 || nameColumnIndex == 0 || lastNameColumnIndex == 0)
+                else
                 {
-                    throw new Exception("mandatory columns not found");
+                    Logger.LogInformation($"{i} - {rowDto}");
                 }
-
-                string email = worksheet.Cells[i, emailColumnIndex].GetValue<string>()?.Trim().ToLower() ?? string.Empty;
-                string name = worksheet.Cells[i, nameColumnIndex].GetValue<string>()?.Trim() ?? string.Empty;
-                string lastName = worksheet.Cells[i, lastNameColumnIndex].GetValue<string>()?.Trim() ?? string.Empty;
-
-
-                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(lastName))
-                {
-                    throw new Exception($"mandatory value not found at line {i}");
-                }
-
             }
 
         }
-    }
+        protected static void AddColumnMapping(string propertyName, int i, Dictionary<string, int> columnMapping)
+        {
+            if (columnMapping.ContainsKey(propertyName))
+            {
+                throw new Exception($"duplicated column name at columns {columnMapping[propertyName]} {i}");
+            }
 
+            columnMapping.Add(propertyName, i);
+        }
+
+        protected abstract T MapRow(ExcelWorksheet worksheet, int i, Dictionary<string, int> columnMapping);
+        protected abstract void ValidateColumnMapping(Dictionary<string, int> columnMapping);
+        protected abstract void MapColumns(string columnName, int i1, Dictionary<string, int> columnMapping);
+
+        protected static TC? GetCellValue<TC>(ExcelRange cells, int row, Dictionary<string, int> columnMapping, string columnName)
+        {
+            var rtn = default(TC);
+            if (columnMapping.ContainsKey(columnName))
+            {
+                rtn = cells[row, columnMapping[columnName]].GetValue<TC>();
+            }
+            return rtn;
+        }
+
+    }
 }
