@@ -21,8 +21,9 @@ namespace ExcelImporter
             Config = configuration.Value;
         }
 
-        public async Task RunAsync(string filePath, CancellationToken cancellationToken)
+        public async Task<IEnumerable<T>> RunAsync(string filePath, CancellationToken cancellationToken)
         {
+            var rtn = new List<T>();
             Logger.LogInformation("RunAsync");
 
             var fileInfo = new FileInfo(filePath);
@@ -64,9 +65,11 @@ namespace ExcelImporter
                 else
                 {
                     Logger.LogInformation($"{i} - {rowDto}");
+                    //todo it would be nice to use async ienumerable yeld
+                    rtn.Add(rowDto);
                 }
             }
-
+            return rtn;
         }
         protected static void AddColumnMapping(string propertyName, int i, Dictionary<string, int> columnMapping)
         {

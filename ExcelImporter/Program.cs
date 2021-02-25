@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,7 +28,15 @@ namespace ExcelImporter
                 await using var servicesProvider = services.BuildServiceProvider();
                 logger.Info("Starting...");
                 //servicesProvider.GetRequiredService<ConsoleApp>().Run();
-                await servicesProvider.GetRequiredService<RowDtoExcelReader>().RunAsync("D:\\Temp\\test.xlsx", CancellationToken.None);
+                var rows = await servicesProvider.GetRequiredService<RowDtoExcelReader>().RunAsync("D:\\Temp\\test.xlsx", CancellationToken.None);
+                var list = new HashSet<string>();
+                foreach (var row in rows)
+                {
+                    if (!list.Add(row.Email))
+                    {
+                        logger.Warn($"duplicated email {row}");
+                    }
+                }
             }
             catch (Exception ex)
             {
